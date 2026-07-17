@@ -120,6 +120,8 @@
       <button class="tbtn" id="btnNew">Nova jornada</button>
       <button class="tbtn" id="btnLoad">Carregar JSON</button>
       <button class="tbtn" id="btnSave">Salvar JSON</button>
+      <button class="tbtn" id="btnExportPng">Exportar PNG</button>
+      <button class="tbtn" id="btnExportPdf">Exportar PDF</button>
     </div>
   </div>
 
@@ -271,6 +273,9 @@
   </div>
 
   <input type="file" id="fileInput" accept="application/json" style="display:none">
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <script>
   const NODE_TYPES = {
@@ -800,6 +805,77 @@
     updatePlaceholder();
     closeEditPanel();
   }
+
+  async function captureJourneyCanvas() {
+    const nodeEls = Array.from(nodesLayer.querySelectorAll('.node'));
+    const canvasRect = canvasInner.getBoundingClientRect();
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    nodeEls.forEach(el => {
+      const r = el.getBoundingClientRect();
+      minX = Math.min(minX, r.left - canvasRect.left);
+      minY = Math.min(minY, r.top - canvasRect.top);
+      maxX = Math.max(maxX, r.right - canvasRect.left);
+      maxY = Math.max(maxY, r.bottom - canvasRect.top);
+    });
+    const pad = 40;
+    minX = Math.max(0, Math.floor(minX - pad));
+    minY = Math.max(0, Math.floor(minY - pad));
+    const width = Math.ceil(maxX - minX + pad);
+    const height = Math.ceil(maxY - minY + pad);
+    return html2canvas(canvasInner, { x: minX, y: minY, width, height, backgroundColor: '#F4F5F7', scale: 2 });
+  }
+
+  function safeJourneyFileName() {
+    return (state.journeyName || 'jornada').replace(/[^a-z0-9]+/gi, '_').toLowerCase();
+  }
+
+  document.getElementById('btnExportPng').addEventListener('click', async (e) => {
+    if (!state.nodes.length) { alert('Adicione itens à jornada antes de exportar.'); return; }
+    const btn = e.currentTarget;
+    const original = btn.textContent;
+    btn.textContent = 'Gerando...';
+    btn.disabled = true;
+    try {
+      const canvas = await captureJourneyCanvas();
+      canvas.toBlob(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = safeJourneyFileName() + '.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      });
+    } catch (err) {
+      alert('Não foi possível gerar o PNG.');
+    } finally {
+      btn.textContent = original;
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('btnExportPdf').addEventListener('click', async (e) => {
+    if (!state.nodes.length) { alert('Adicione itens à jornada antes de exportar.'); return; }
+    const btn = e.currentTarget;
+    const original = btn.textContent;
+    btn.textContent = 'Gerando...';
+    btn.disabled = true;
+    try {
+      const canvas = await captureJourneyCanvas();
+      const imgData = canvas.toDataURL('image/png');
+      const { jsPDF } = window.jspdf;
+      const orientation = canvas.width >= canvas.height ? 'landscape' : 'portrait';
+      const pdf = new jsPDF({ orientation, unit: 'px', format: [canvas.width, canvas.height] });
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save(safeJourneyFileName() + '.pdf');
+    } catch (err) {
+      alert('Não foi possível gerar o PDF.');
+    } finally {
+      btn.textContent = original;
+      btn.disabled = false;
+    }
+  });
 
   updatePlaceholder();
 </script>
