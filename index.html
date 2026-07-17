@@ -66,7 +66,7 @@
   .nodes-layer{position:absolute;top:0;left:0;width:2600px;height:1700px;}
   .canvas-placeholder{position:absolute;top:120px;left:60px;color:var(--text-muted);font-size:13px;max-width:260px;pointer-events:none;}
 
-  .node{position:absolute;width:200px;background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.08);}
+  .node{position:absolute;width:280px;background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.08);}
   .node-header{display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid var(--border);position:relative;cursor:grab;}
   .node-header:active{cursor:grabbing;}
   .node-title-group{flex:1;min-width:0;}
@@ -371,7 +371,7 @@
     const type = e.dataTransfer.getData('text/plain');
     if (!type || !NODE_TYPES[type]) return;
     const rect = canvasInner.getBoundingClientRect();
-    const x = Math.max(10, e.clientX - rect.left - 100);
+    const x = Math.max(10, e.clientX - rect.left - 140);
     const y = Math.max(10, e.clientY - rect.top - 20);
     addNode(type, x, y);
   });
