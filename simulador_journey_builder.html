@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Simulador de Journey Builder</title>
+<style>
+  :root{
+    --green:#3DA35D;
+    --teal:#1EA6A0;
+    --tealdark:#0E7C77;
+    --orange:#F2861D;
+    --navy:#123A5C;
+    --blue:#1C64D1;
+    --bg:#F4F5F7;
+    --panel:#ffffff;
+    --border:#D8DCE3;
+    --text:#1F2430;
+    --text-muted:#6B7280;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--text);}
+  body{display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+
+  .app-header{background:var(--navy);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;}
+  .app-header .crumbs{font-size:11px;color:rgba(255,255,255,.65);}
+  .app-header input#journeyName{background:transparent;border:none;color:#fff;font-size:15px;font-weight:600;border-bottom:1px dashed rgba(255,255,255,.4);padding:2px 4px;min-width:280px;}
+  .app-header input#journeyName:focus{outline:none;border-bottom-color:#fff;}
+  .toolbar{display:flex;gap:8px;margin-left:auto;}
+  .tbtn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:#fff;padding:7px 14px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:500;}
+  .tbtn:hover{background:rgba(255,255,255,.22);}
+
+  .hint-bar{background:#FFF7E6;border-bottom:1px solid #F3E0B0;color:#7A5A0A;font-size:12px;padding:6px 16px;flex-shrink:0;}
+
+  .layout{flex:1;display:flex;min-height:0;}
+
+  .sidebar{width:250px;flex-shrink:0;overflow-y:auto;background:var(--panel);border-right:1px solid var(--border);padding:8px 0 40px;}
+  .category-title{display:flex;align-items:center;gap:6px;padding:10px 14px 6px;font-size:11px;font-weight:700;color:var(--text-muted);cursor:pointer;text-transform:uppercase;letter-spacing:.04em;user-select:none;}
+  .category-title .chev{transition:transform .15s;}
+  .category.collapsed .chev{transform:rotate(-90deg);}
+  .category.collapsed .category-items{display:none;}
+  .category-items{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:2px 12px 12px;}
+  .palette-item{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;border-radius:8px;cursor:grab;text-align:center;}
+  .palette-item:hover{background:var(--bg);}
+  .palette-item:active{cursor:grabbing;}
+  .palette-item span.plabel{font-size:10px;color:var(--text);line-height:1.2;}
+
+  .badge{width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;font-weight:700;flex-shrink:0;}
+  .badge i{font-style:normal;}
+  .badge.circle{border-radius:50%;}
+  .badge.square{border-radius:8px;}
+  .badge.diamond{border-radius:6px;transform:rotate(45deg);}
+  .badge.diamond i{display:inline-block;transform:rotate(-45deg);}
+  .palette-item .badge{width:34px;height:34px;font-size:9px;}
+  .c-green{background:var(--green);}
+  .c-teal{background:var(--teal);}
+  .c-tealdark{background:var(--tealdark);}
+  .c-orange{background:var(--orange);}
+  .c-navy{background:var(--navy);}
+  .c-blue{background:var(--blue);}
+
+  .canvas-wrap{flex:1;overflow:auto;position:relative;background:var(--bg);}
+  .canvas-inner{width:2600px;height:1700px;position:relative;
+    background-image:radial-gradient(circle, #DDE1E8 1px, transparent 1px);
+    background-size:22px 22px;}
+  svg#connSvg{position:absolute;top:0;left:0;width:2600px;height:1700px;pointer-events:none;}
+  .nodes-layer{position:absolute;top:0;left:0;width:2600px;height:1700px;}
+  .canvas-placeholder{position:absolute;top:120px;left:60px;color:var(--text-muted);font-size:13px;max-width:260px;pointer-events:none;}
+
+  .node{position:absolute;width:200px;background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.08);}
+  .node-header{display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid var(--border);position:relative;cursor:grab;}
+  .node-header:active{cursor:grabbing;}
+  .node-title-group{flex:1;min-width:0;}
+  .node-type{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;}
+  .node-title-text{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .node-btn{border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:13px;padding:2px 5px;border-radius:4px;line-height:1;}
+  .node-btn:hover{background:var(--bg);color:var(--text);}
+  .single-out-row{display:flex;align-items:center;justify-content:space-between;padding:7px 8px;}
+  .branches{padding:2px 8px 8px;}
+  .branch-row{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 0;border-top:1px dashed var(--border);}
+  .branch-row:first-child{border-top:none;}
+  .branch-label{font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .branch-label.muted{color:var(--text-muted);}
+  .port{width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid #94A3B8;flex-shrink:0;cursor:crosshair;}
+  .port:hover{border-color:var(--navy);background:var(--navy);}
+  .port-target{position:absolute;left:-7px;top:26px;}
+
+  .edit-panel{width:310px;flex-shrink:0;overflow-y:auto;background:var(--panel);border-left:1px solid var(--border);padding:16px;}
+  .edit-panel h3{font-size:14px;margin:0 0 14px;}
+  .empty-hint{color:var(--text-muted);font-size:13px;padding:30px 4px;text-align:center;line-height:1.5;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:11px;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.03em;}
+  .field input[type=text], .field textarea{width:100%;border:1px solid var(--border);border-radius:6px;padding:8px;font-size:13px;font-family:inherit;}
+  .field textarea{min-height:80px;resize:vertical;}
+  .field textarea.textarea-lg{min-height:150px;}
+  .char-counter{font-size:11px;color:var(--text-muted);text-align:right;margin-top:3px;}
+  .char-counter.over{color:#B91C1C;font-weight:600;}
+  .email-preview{border:1px solid var(--border);border-radius:6px;padding:9px 10px;background:var(--bg);font-size:12px;line-height:1.5;}
+  .preview-subject{font-weight:600;color:var(--text);}
+  .preview-pre{color:var(--text-muted);}
+  .branch-edit-row{display:flex;gap:6px;margin-bottom:6px;align-items:center;}
+  .branch-edit-row input{flex:1;}
+  .branch-edit-row button{border:none;background:#FEE2E2;color:#B91C1C;border-radius:6px;width:26px;height:26px;cursor:pointer;flex-shrink:0;}
+  .add-branch-btn{font-size:12px;color:var(--navy);background:none;border:1px dashed var(--border);border-radius:6px;padding:7px 10px;cursor:pointer;width:100%;}
+  .add-branch-btn:hover{background:var(--bg);}
+  .danger-btn{background:#FEE2E2;color:#B91C1C;border:1px solid #FCA5A5;border-radius:6px;padding:9px 12px;font-size:12px;cursor:pointer;width:100%;margin-top:18px;}
+  .danger-btn:hover{background:#FECACA;}
+</style>
+</head>
+<body>
+
+  <div class="app-header">
+    <div>
+      <div class="crumbs">Journeys Dashboard &gt; Journey</div>
+      <input type="text" id="journeyName" value="">
+    </div>
+    <div class="toolbar">
+      <button class="tbtn" id="btnNew">Nova jornada</button>
+      <button class="tbtn" id="btnLoad">Carregar JSON</button>
+      <button class="tbtn" id="btnSave">Salvar JSON</button>
+    </div>
+  </div>
+
+  <div class="hint-bar">
+    Arraste os itens da barra lateral para o quadro. Puxe um círculo de saída até a entrada de outro item para conectar. Clique num item para editar título e descrição. Duplo clique numa linha apaga a conexão.
+  </div>
+
+  <div class="layout">
+
+    <div class="sidebar" id="sidebar">
+
+      <div class="category" data-cat="entry">
+        <div class="category-title"><span class="chev">▾</span> Entry Sources</div>
+        <div class="category-items">
+          <div class="palette-item" draggable="true" data-type="api_event">
+            <span class="badge circle c-green"><i>API</i></span>
+            <span class="plabel">API Event</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="data_extension">
+            <span class="badge circle c-green"><i>DE</i></span>
+            <span class="plabel">Data Extension</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="category" data-cat="message">
+        <div class="category-title"><span class="chev">▾</span> Messages</div>
+        <div class="category-items">
+          <div class="palette-item" draggable="true" data-type="email">
+            <span class="badge square c-teal"><i>EM</i></span>
+            <span class="plabel">Email</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="push">
+            <span class="badge square c-teal"><i>PU</i></span>
+            <span class="plabel">Push Notification</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="sms">
+            <span class="badge square c-teal"><i>SMS</i></span>
+            <span class="plabel">SMS</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="whatsapp">
+            <span class="badge square c-teal"><i>WA</i></span>
+            <span class="plabel">WhatsApp</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="category" data-cat="flow">
+        <div class="category-title"><span class="chev">▾</span> Flow Control</div>
+        <div class="category-items">
+          <div class="palette-item" draggable="true" data-type="decision_split">
+            <span class="badge diamond c-orange"><i>?</i></span>
+            <span class="plabel">Decision Split</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="einstein_sto">
+            <span class="badge diamond c-navy"><i>STO</i></span>
+            <span class="plabel">Einstein STO</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="engagement_split">
+            <span class="badge diamond c-orange"><i>ES</i></span>
+            <span class="plabel">Engagement Split</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="frequency_split">
+            <span class="badge diamond c-navy"><i>FS</i></span>
+            <span class="plabel">Frequency Split</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="join">
+            <span class="badge diamond c-orange"><i>JN</i></span>
+            <span class="plabel">Join</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="path_optimizer">
+            <span class="badge diamond c-orange"><i>PO</i></span>
+            <span class="plabel">Path Optimizer</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="random_split">
+            <span class="badge diamond c-navy"><i>RS</i></span>
+            <span class="plabel">Random Split</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="scoring_split">
+            <span class="badge diamond c-navy"><i>SS</i></span>
+            <span class="plabel">Scoring Split</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="wait_attribute">
+            <span class="badge diamond c-orange"><i>W·A</i></span>
+            <span class="plabel">Wait By Attribute</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="wait_duration">
+            <span class="badge diamond c-orange"><i>W·D</i></span>
+            <span class="plabel">Wait By Duration</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="wait_chat">
+            <span class="badge diamond c-orange"><i>W·C</i></span>
+            <span class="plabel">Wait Until Chat Response</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="wait_date">
+            <span class="badge diamond c-orange"><i>W·Dt</i></span>
+            <span class="plabel">Wait Until Date</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="wait_event">
+            <span class="badge diamond c-orange"><i>W·E</i></span>
+            <span class="plabel">Wait Until Event</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="wait_inapp_event">
+            <span class="badge diamond c-orange"><i>W·IA</i></span>
+            <span class="plabel">Wait Until In-App Event</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="wait_push_event">
+            <span class="badge diamond c-orange"><i>W·P</i></span>
+            <span class="plabel">Wait Until Push Event</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="category" data-cat="update">
+        <div class="category-title"><span class="chev">▾</span> Customer Updates</div>
+        <div class="category-items">
+          <div class="palette-item" draggable="true" data-type="personalization_activity">
+            <span class="badge square c-tealdark"><i>PA</i></span>
+            <span class="plabel">Personalization Activity</span>
+          </div>
+          <div class="palette-item" draggable="true" data-type="update_contact">
+            <span class="badge square c-blue"><i>UC</i></span>
+            <span class="plabel">Update Contact</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="canvas-wrap" id="canvasWrap">
+      <div class="canvas-inner" id="canvasInner">
+        <svg id="connSvg">
+          <defs>
+            <marker id="arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#64748B"/>
+            </marker>
+          </defs>
+          <g id="connGroup"></g>
+        </svg>
+        <div class="nodes-layer" id="nodesLayer"></div>
+        <div class="canvas-placeholder" id="canvasPlaceholder">Arraste um Entry Source (API Event ou Data Extension) da barra lateral para começar a jornada.</div>
+      </div>
+    </div>
+
+    <div class="edit-panel" id="editPanel">
+      <div class="empty-hint">Clique em um item da jornada para editar título, descrição e caminhos.</div>
+    </div>
+
+  </div>
+
+  <input type="file" id="fileInput" accept="application/json" style="display:none">
+
+<script>
+  const NODE_TYPES = {
+    api_event:      {label:'API Event', category:'entry', shape:'circle', color:'green', icon:'API', hasInput:false, splits:false},
+    data_extension: {label:'Data Extension', category:'entry', shape:'circle', color:'green', icon:'DE', hasInput:false, splits:false},
+
+    email:    {label:'Email', category:'message', shape:'square', color:'teal', icon:'EM', hasInput:true, splits:false},
+    push:     {label:'Push Notification', category:'message', shape:'square', color:'teal', icon:'PU', hasInput:true, splits:false},
+    sms:      {label:'SMS', category:'message', shape:'square', color:'teal', icon:'SMS', hasInput:true, splits:false},
+    whatsapp: {label:'WhatsApp', category:'message', shape:'square', color:'teal', icon:'WA', hasInput:true, splits:false},
+
+    decision_split:   {label:'Decision Split', category:'flow', shape:'diamond', color:'orange', icon:'?', hasInput:true, splits:true, defaultBranches:['Sim','Não']},
+    einstein_sto:     {label:'Einstein STO', category:'flow', shape:'diamond', color:'navy', icon:'STO', hasInput:true, splits:false},
+    engagement_split: {label:'Engagement Split', category:'flow', shape:'diamond', color:'orange', icon:'ES', hasInput:true, splits:true, defaultBranches:['Engajou','Não engajou']},
+    frequency_split:  {label:'Frequency Split', category:'flow', shape:'diamond', color:'navy', icon:'FS', hasInput:true, splits:true, defaultBranches:['Caminho 1','Caminho 2']},
+    join:             {label:'Join', category:'flow', shape:'diamond', color:'orange', icon:'JN', hasInput:true, splits:false},
+    path_optimizer:   {label:'Path Optimizer', category:'flow', shape:'diamond', color:'orange', icon:'PO', hasInput:true, splits:true, defaultBranches:['Caminho A','Caminho B']},
+    random_split:     {label:'Random Split', category:'flow', shape:'diamond', color:'navy', icon:'RS', hasInput:true, splits:true, defaultBranches:['50%','50%']},
+    scoring_split:    {label:'Scoring Split', category:'flow', shape:'diamond', color:'navy', icon:'SS', hasInput:true, splits:true, defaultBranches:['Alto','Baixo']},
+    wait_attribute:   {label:'Wait By Attribute', category:'flow', shape:'diamond', color:'orange', icon:'W·A', hasInput:true, splits:false},
+    wait_duration:    {label:'Wait By Duration', category:'flow', shape:'diamond', color:'orange', icon:'W·D', hasInput:true, splits:false},
+    wait_chat:        {label:'Wait Until Chat Response', category:'flow', shape:'diamond', color:'orange', icon:'W·C', hasInput:true, splits:false},
+    wait_date:        {label:'Wait Until Date', category:'flow', shape:'diamond', color:'orange', icon:'W·Dt', hasInput:true, splits:false},
+    wait_event:       {label:'Wait Until Event', category:'flow', shape:'diamond', color:'orange', icon:'W·E', hasInput:true, splits:false},
+    wait_inapp_event: {label:'Wait Until In-App Event', category:'flow', shape:'diamond', color:'orange', icon:'W·IA', hasInput:true, splits:false},
+    wait_push_event:  {label:'Wait Until Push Event', category:'flow', shape:'diamond', color:'orange', icon:'W·P', hasInput:true, splits:false},
+
+    personalization_activity: {label:'Personalization Activity', category:'update', shape:'square', color:'tealdark', icon:'PA', hasInput:true, splits:false},
+    update_contact:           {label:'Update Contact', category:'update', shape:'square', color:'blue', icon:'UC', hasInput:true, splits:false}
+  };
+
+  const FIELD_SCHEMAS = {
+    default: [
+      { key: 'title', label: 'Título', type: 'text', placeholder: 'Nomeie esse item' },
+      { key: 'description', label: 'Descrição', type: 'textarea', placeholder: 'Detalhes, regras, conteúdo...' }
+    ],
+    data_extension: [
+      { key: 'title', label: 'Nome da DE', type: 'text', placeholder: 'Ex: DE_Aniversariantes_Julho' },
+      { key: 'filtros', label: 'Filtros', type: 'textarea', placeholder: 'Critérios de filtro aplicados nessa base...' },
+      { key: 'tamanhoBase', label: 'Tamanho da Base', type: 'text', placeholder: 'Ex: 120.000 registros' },
+      { key: 'description', label: 'Descrição', type: 'textarea', placeholder: 'Detalhes adicionais...' }
+    ],
+    email: [
+      { key: 'title', label: 'Título', type: 'text', placeholder: 'Nomeie esse item' },
+      { key: 'publicoAlvo', label: 'Público-Alvo', type: 'text', placeholder: 'Ex: base ativa SP, categoria bebidas' },
+      { key: 'assunto', label: 'Assunto', type: 'text-counter', maxLength: 40, placeholder: 'Assunto do e-mail' },
+      { key: 'preheader', label: 'Pré-header', type: 'text-counter', maxLength: 100, placeholder: 'Texto de pré-visualização' },
+      { key: 'previewSubjectPreheader', type: 'email-preview' },
+      { key: 'conteudo', label: 'Conteúdo', type: 'textarea-lg', placeholder: 'Corpo do e-mail, blocos, ofertas...' },
+      { key: 'description', label: 'Observações', type: 'textarea', placeholder: 'Observações adicionais...' }
+    ]
+  };
+
+  function uid(){
+    if(window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'id-'+Math.random().toString(36).slice(2)+Date.now().toString(36);
+  }
+  function escapeHtml(str){
+    return String(str==null?'':str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function formatDate(d){
+    return d.toLocaleDateString('pt-BR', {day:'2-digit', month:'long', year:'numeric'}) + ' às ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+  }
+
+  const state = {
+    journeyName: 'New Journey - ' + formatDate(new Date()),
+    nodes: [],
+    connections: []
+  };
+
+  const canvasWrap = document.getElementById('canvasWrap');
+  const canvasInner = document.getElementById('canvasInner');
+  const nodesLayer = document.getElementById('nodesLayer');
+  const connGroup = document.getElementById('connGroup');
+  const editPanel = document.getElementById('editPanel');
+  const journeyNameInput = document.getElementById('journeyName');
+  const placeholder = document.getElementById('canvasPlaceholder');
+  const sidebar = document.getElementById('sidebar');
+
+  journeyNameInput.value = state.journeyName;
+  journeyNameInput.addEventListener('input', () => { state.journeyName = journeyNameInput.value; });
+
+  // ---------- Sidebar: collapse + drag start ----------
+  sidebar.querySelectorAll('.category-title').forEach(title => {
+    title.addEventListener('click', () => title.parentElement.classList.toggle('collapsed'));
+  });
+  sidebar.addEventListener('dragstart', e => {
+    const item = e.target.closest('.palette-item');
+    if (!item) return;
+    e.dataTransfer.setData('text/plain', item.dataset.type);
+    e.dataTransfer.effectAllowed = 'copy';
+  });
+
+  // ---------- Drop on canvas ----------
+  canvasWrap.addEventListener('dragover', e => e.preventDefault());
+  canvasWrap.addEventListener('drop', e => {
+    e.preventDefault();
+    const type = e.dataTransfer.getData('text/plain');
+    if (!type || !NODE_TYPES[type]) return;
+    const rect = canvasInner.getBoundingClientRect();
+    const x = Math.max(10, e.clientX - rect.left - 100);
+    const y = Math.max(10, e.clientY - rect.top - 20);
+    addNode(type, x, y);
+  });
+
+  function addNode(type, x, y) {
+    const meta = NODE_TYPES[type];
+    const node = { id: uid(), type, title: '', description: '', x, y };
+    if (meta.splits) {
+      node.branches = (meta.defaultBranches || ['Caminho 1', 'Caminho 2']).map(l => ({ id: uid(), label: l }));
+    }
+    state.nodes.push(node);
+    nodesLayer.appendChild(createNodeElement(node));
+    updatePlaceholder();
+    renderConnections();
+  }
+
+  function nodeInnerHtml(node) {
+    const meta = NODE_TYPES[node.type];
+    const titleText = node.title && node.title.trim() ? escapeHtml(node.title) : '(sem título)';
+    let portTarget = '';
+    if (meta.hasInput) {
+      portTarget = `<div class="port port-target" data-node-id="${node.id}" title="Entrada"></div>`;
+    }
+    let body = '';
+    if (meta.splits) {
+      body = `<div class="branches">` + node.branches.map(b => `
+        <div class="branch-row" data-branch-id="${b.id}">
+          <span class="branch-label">${escapeHtml(b.label)}</span>
+          <div class="port port-source" data-node-id="${node.id}" data-port-id="${b.id}" title="Caminho: ${escapeHtml(b.label)}"></div>
+        </div>`).join('') + `</div>`;
+    } else {
+      body = `<div class="single-out-row">
+        <span class="branch-label muted">Avançar</span>
+        <div class="port port-source" data-node-id="${node.id}" data-port-id="out" title="Saída"></div>
+      </div>`;
+    }
+    return `
+      <div class="node-header">
+        <span class="badge ${meta.shape} c-${meta.color}"><i>${meta.icon}</i></span>
+        <div class="node-title-group">
+          <div class="node-type">${meta.label}</div>
+          <div class="node-title-text">${titleText}</div>
+        </div>
+        <button class="node-btn node-edit-btn" title="Editar">&#9998;</button>
+        <button class="node-btn node-del-btn" title="Excluir">&times;</button>
+      </div>
+      ${portTarget}
+      ${body}
+    `;
+  }
+
+  function createNodeElement(node) {
+    const div = document.createElement('div');
+    div.className = 'node';
+    div.dataset.id = node.id;
+    div.style.left = node.x + 'px';
+    div.style.top = node.y + 'px';
+    div.innerHTML = nodeInnerHtml(node);
+    return div;
+  }
+
+  function rerenderNodeBody(node) {
+    const el = nodesLayer.querySelector(`.node[data-id="${node.id}"]`);
+    if (el) el.innerHTML = nodeInnerHtml(node);
+  }
+
+  function updateNodeTitleDisplay(nodeId) {
+    const node = state.nodes.find(n => n.id === nodeId);
+    const el = nodesLayer.querySelector(`.node[data-id="${nodeId}"] .node-title-text`);
+    if (el && node) el.textContent = node.title && node.title.trim() ? node.title : '(sem título)';
+  }
+  function updateBranchLabelDisplay(nodeId, branchId, label) {
+    const el = nodesLayer.querySelector(`.node[data-id="${nodeId}"] .branch-row[data-branch-id="${branchId}"] .branch-label`);
+    if (el) el.textContent = label;
+  }
+
+  function updatePlaceholder() {
+    placeholder.style.display = state.nodes.length ? 'none' : 'block';
+  }
+
+  // ---------- Node move + connection dragging ----------
+  let dragState = null;
+  let clickCandidate = null;
+  let tempLineEl = null;
+
+  nodesLayer.addEventListener('mousedown', e => {
+    const portSource = e.target.closest('.port-source');
+    if (portSource) {
+      e.preventDefault();
+      dragState = { type: 'connect', fromNodeId: portSource.dataset.nodeId, fromPort: portSource.dataset.portId };
+      drawTempLine(portSource, e.clientX, e.clientY);
+      return;
+    }
+    const nodeEl = e.target.closest('.node');
+    if (!nodeEl) return;
+    const nodeId = nodeEl.dataset.id;
+
+    if (e.target.closest('.node-del-btn')) { e.stopPropagation(); deleteNode(nodeId); return; }
+    if (e.target.closest('.node-edit-btn')) { e.stopPropagation(); openEditPanel(nodeId); return; }
+
+    const header = e.target.closest('.node-header');
+    if (header) {
+      const node = state.nodes.find(n => n.id === nodeId);
+      const rect = canvasInner.getBoundingClientRect();
+      dragState = { type: 'move', nodeId, offsetX: e.clientX - rect.left - node.x, offsetY: e.clientY - rect.top - node.y };
+      return;
+    }
+    clickCandidate = { nodeId, startX: e.clientX, startY: e.clientY };
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragState) return;
+    if (dragState.type === 'move') {
+      const rect = canvasInner.getBoundingClientRect();
+      const node = state.nodes.find(n => n.id === dragState.nodeId);
+      node.x = Math.max(0, e.clientX - rect.left - dragState.offsetX);
+      node.y = Math.max(0, e.clientY - rect.top - dragState.offsetY);
+      const el = nodesLayer.querySelector(`.node[data-id="${node.id}"]`);
+      el.style.left = node.x + 'px';
+      el.style.top = node.y + 'px';
+      renderConnections();
+    } else if (dragState.type === 'connect') {
+      updateTempLine(e.clientX, e.clientY);
+    }
+  });
+
+  document.addEventListener('mouseup', e => {
+    if (dragState && dragState.type === 'connect') {
+      clearTempLine();
+      const target = document.elementFromPoint(e.clientX, e.clientY);
+      const portTarget = target ? target.closest('.port-target') : null;
+      if (portTarget) {
+        const toNodeId = portTarget.dataset.nodeId;
+        if (toNodeId !== dragState.fromNodeId) {
+          state.connections = state.connections.filter(c => !(c.fromNodeId === dragState.fromNodeId && c.fromPort === dragState.fromPort));
+          state.connections.push({ id: uid(), fromNodeId: dragState.fromNodeId, fromPort: dragState.fromPort, toNodeId });
+          renderConnections();
+        }
+      }
+    }
+    if (clickCandidate) {
+      const dx = Math.abs(e.clientX - clickCandidate.startX);
+      const dy = Math.abs(e.clientY - clickCandidate.startY);
+      if (dx < 5 && dy < 5) openEditPanel(clickCandidate.nodeId);
+    }
+    dragState = null;
+    clickCandidate = null;
+  });
+
+  function bezierPath(x1, y1, x2, y2) {
+    const dx = Math.max(60, Math.abs(x2 - x1) / 2);
+    return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+  }
+
+  function drawTempLine(portEl, clientX, clientY) {
+    const rect = canvasInner.getBoundingClientRect();
+    const pr = portEl.getBoundingClientRect();
+    const x1 = pr.left + pr.width / 2 - rect.left;
+    const y1 = pr.top + pr.height / 2 - rect.top;
+    dragState.startX = x1;
+    dragState.startY = y1;
+    tempLineEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    tempLineEl.setAttribute('fill', 'none');
+    tempLineEl.setAttribute('stroke', '#94A3B8');
+    tempLineEl.setAttribute('stroke-width', '2');
+    tempLineEl.setAttribute('stroke-dasharray', '5 4');
+    tempLineEl.setAttribute('d', bezierPath(x1, y1, clientX - rect.left, clientY - rect.top));
+    connGroup.appendChild(tempLineEl);
+  }
+  function updateTempLine(clientX, clientY) {
+    if (!tempLineEl) return;
+    const rect = canvasInner.getBoundingClientRect();
+    tempLineEl.setAttribute('d', bezierPath(dragState.startX, dragState.startY, clientX - rect.left, clientY - rect.top));
+  }
+  function clearTempLine() {
+    if (tempLineEl) { tempLineEl.remove(); tempLineEl = null; }
+  }
+
+  function renderConnections() {
+    connGroup.querySelectorAll('.conn-wrap').forEach(el => el.remove());
+    const rect = canvasInner.getBoundingClientRect();
+    state.connections.forEach(conn => {
+      const fromPortEl = nodesLayer.querySelector(`.node[data-id="${conn.fromNodeId}"] .port-source[data-port-id="${conn.fromPort}"]`);
+      const toPortEl = nodesLayer.querySelector(`.node[data-id="${conn.toNodeId}"] .port-target`);
+      if (!fromPortEl || !toPortEl) return;
+      const fr = fromPortEl.getBoundingClientRect();
+      const tr = toPortEl.getBoundingClientRect();
+      const x1 = fr.left + fr.width / 2 - rect.left;
+      const y1 = fr.top + fr.height / 2 - rect.top;
+      const x2 = tr.left + tr.width / 2 - rect.left;
+      const y2 = tr.top + tr.height / 2 - rect.top;
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.setAttribute('class', 'conn-wrap');
+      const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      hit.setAttribute('d', bezierPath(x1, y1, x2, y2));
+      hit.setAttribute('fill', 'none');
+      hit.setAttribute('stroke', 'transparent');
+      hit.setAttribute('stroke-width', '14');
+      hit.style.cursor = 'pointer';
+      hit.style.pointerEvents = 'stroke';
+      hit.addEventListener('dblclick', () => deleteConnection(conn.id));
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      line.setAttribute('d', bezierPath(x1, y1, x2, y2));
+      line.setAttribute('fill', 'none');
+      line.setAttribute('stroke', '#64748B');
+      line.setAttribute('stroke-width', '2');
+      line.setAttribute('marker-end', 'url(#arrowhead)');
+      g.appendChild(hit);
+      g.appendChild(line);
+      connGroup.appendChild(g);
+    });
+  }
+
+  function deleteConnection(id) {
+    state.connections = state.connections.filter(c => c.id !== id);
+    renderConnections();
+  }
+
+  function deleteNode(nodeId) {
+    if (!confirm('Excluir este item da jornada?')) return;
+    state.nodes = state.nodes.filter(n => n.id !== nodeId);
+    state.connections = state.connections.filter(c => c.fromNodeId !== nodeId && c.toNodeId !== nodeId);
+    const el = nodesLayer.querySelector(`.node[data-id="${nodeId}"]`);
+    if (el) el.remove();
+    renderConnections();
+    updatePlaceholder();
+    if (currentEditId === nodeId) closeEditPanel();
+  }
+
+  // ---------- Edit panel ----------
+  let currentEditId = null;
+
+  function buildEmailPreviewHtml(node) {
+    const subject = node.assunto && node.assunto.trim() ? escapeHtml(node.assunto) : '(sem assunto)';
+    const pre = node.preheader && node.preheader.trim() ? escapeHtml(node.preheader) : '(sem pré-header)';
+    return `<div class="preview-subject">${subject}</div><div class="preview-pre">${pre}</div>`;
+  }
+
+  function renderFieldHtml(field, node) {
+    if (field.type === 'email-preview') {
+      return `<div class="field"><label>Pré-visualização</label><div class="email-preview" id="emailPreviewBox">${buildEmailPreviewHtml(node)}</div></div>`;
+    }
+    const value = typeof node[field.key] === 'string' ? node[field.key] : '';
+    if (field.type === 'text') {
+      return `<div class="field"><label>${field.label}</label><input type="text" id="f_${field.key}" value="${escapeHtml(value)}" placeholder="${escapeHtml(field.placeholder || '')}"></div>`;
+    }
+    if (field.type === 'textarea') {
+      return `<div class="field"><label>${field.label}</label><textarea id="f_${field.key}" placeholder="${escapeHtml(field.placeholder || '')}">${escapeHtml(value)}</textarea></div>`;
+    }
+    if (field.type === 'textarea-lg') {
+      return `<div class="field"><label>${field.label}</label><textarea id="f_${field.key}" class="textarea-lg" placeholder="${escapeHtml(field.placeholder || '')}">${escapeHtml(value)}</textarea></div>`;
+    }
+    if (field.type === 'text-counter') {
+      const len = value.length;
+      const over = len > field.maxLength;
+      return `<div class="field">
+        <label>${field.label}</label>
+        <input type="text" id="f_${field.key}" value="${escapeHtml(value)}" placeholder="${escapeHtml(field.placeholder || '')}">
+        <div class="char-counter ${over ? 'over' : ''}" id="counter_${field.key}">${len}/${field.maxLength}</div>
+      </div>`;
+    }
+    return '';
+  }
+
+  function openEditPanel(nodeId) {
+    currentEditId = nodeId;
+    const node = state.nodes.find(n => n.id === nodeId);
+    if (!node) return;
+    const meta = NODE_TYPES[node.type];
+    const schema = FIELD_SCHEMAS[node.type] || FIELD_SCHEMAS.default;
+
+    let branchesHtml = '';
+    if (meta.splits) {
+      branchesHtml = `<div class="field"><label>Caminhos (branches)</label><div id="branchList">` +
+        node.branches.map(b => `
+          <div class="branch-edit-row" data-branch-id="${b.id}">
+            <input type="text" value="${escapeHtml(b.label)}" data-branch-input="${b.id}">
+            <button data-branch-remove="${b.id}" title="Remover caminho">&times;</button>
+          </div>`).join('') +
+        `</div><button class="add-branch-btn" id="addBranchBtn">+ Adicionar caminho</button></div>`;
+    }
+
+    const fieldsHtml = schema.map(field => renderFieldHtml(field, node)).join('');
+
+    editPanel.innerHTML = `
+      <h3>${meta.label}</h3>
+      ${fieldsHtml}
+      ${branchesHtml}
+      <button class="danger-btn" id="deleteNodeBtn">Excluir este item</button>
+    `;
+
+    schema.forEach(field => {
+      if (field.type === 'email-preview') return;
+      const el = document.getElementById('f_' + field.key);
+      if (!el) return;
+      el.addEventListener('input', e => {
+        node[field.key] = e.target.value;
+        if (field.key === 'title') updateNodeTitleDisplay(node.id);
+        if (field.type === 'text-counter') {
+          const len = e.target.value.length;
+          const counterEl = document.getElementById('counter_' + field.key);
+          if (counterEl) {
+            counterEl.textContent = len + '/' + field.maxLength;
+            counterEl.classList.toggle('over', len > field.maxLength);
+          }
+        }
+        if (field.key === 'assunto' || field.key === 'preheader') {
+          const previewBox = document.getElementById('emailPreviewBox');
+          if (previewBox) previewBox.innerHTML = buildEmailPreviewHtml(node);
+        }
+      });
+    });
+
+    document.getElementById('deleteNodeBtn').addEventListener('click', () => deleteNode(node.id));
+
+    if (meta.splits) {
+      editPanel.querySelectorAll('[data-branch-input]').forEach(inp => {
+        inp.addEventListener('input', e => {
+          const bId = inp.dataset.branchInput;
+          const branch = node.branches.find(b => b.id === bId);
+          branch.label = e.target.value;
+          updateBranchLabelDisplay(node.id, bId, branch.label);
+        });
+      });
+      editPanel.querySelectorAll('[data-branch-remove]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const bId = btn.dataset.branchRemove;
+          if (node.branches.length <= 1) { alert('É preciso manter ao menos um caminho.'); return; }
+          node.branches = node.branches.filter(b => b.id !== bId);
+          state.connections = state.connections.filter(c => !(c.fromNodeId === node.id && c.fromPort === bId));
+          rerenderNodeBody(node);
+          renderConnections();
+          openEditPanel(node.id);
+        });
+      });
+      document.getElementById('addBranchBtn').addEventListener('click', () => {
+        node.branches.push({ id: uid(), label: 'Novo caminho' });
+        rerenderNodeBody(node);
+        renderConnections();
+        openEditPanel(node.id);
+      });
+    }
+  }
+
+  function closeEditPanel() {
+    currentEditId = null;
+    editPanel.innerHTML = `<div class="empty-hint">Clique em um item da jornada para editar título, descrição e caminhos.</div>`;
+  }
+
+  // ---------- Toolbar: novo / salvar / carregar ----------
+  document.getElementById('btnNew').addEventListener('click', () => {
+    if (state.nodes.length && !confirm('Isso vai apagar a jornada atual (não salva). Continuar?')) return;
+    state.journeyName = 'New Journey - ' + formatDate(new Date());
+    state.nodes = [];
+    state.connections = [];
+    journeyNameInput.value = state.journeyName;
+    nodesLayer.innerHTML = '';
+    renderConnections();
+    updatePlaceholder();
+    closeEditPanel();
+  });
+
+  document.getElementById('btnSave').addEventListener('click', () => {
+    const data = JSON.stringify({ journeyName: state.journeyName, nodes: state.nodes, connections: state.connections }, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const safeName = (state.journeyName || 'jornada').replace(/[^a-z0-9]+/gi, '_').toLowerCase();
+    a.download = safeName + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('btnLoad').addEventListener('click', () => document.getElementById('fileInput').click());
+  document.getElementById('fileInput').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        loadJourney(data);
+      } catch (err) {
+        alert('Não foi possível ler esse arquivo JSON.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  function loadJourney(data) {
+    state.journeyName = data.journeyName || 'Jornada importada';
+    state.nodes = Array.isArray(data.nodes) ? data.nodes : [];
+    state.connections = Array.isArray(data.connections) ? data.connections : [];
+    state.nodes.forEach(n => {
+      const meta = NODE_TYPES[n.type];
+      if (meta && meta.splits && !Array.isArray(n.branches)) {
+        n.branches = (meta.defaultBranches || ['Caminho 1', 'Caminho 2']).map(l => ({ id: uid(), label: l }));
+      }
+      if (typeof n.title !== 'string') n.title = '';
+      if (typeof n.description !== 'string') n.description = '';
+    });
+    journeyNameInput.value = state.journeyName;
+    nodesLayer.innerHTML = '';
+    state.nodes.forEach(n => nodesLayer.appendChild(createNodeElement(n)));
+    renderConnections();
+    updatePlaceholder();
+    closeEditPanel();
+  }
+
+  updatePlaceholder();
+</script>
+</body>
+</html>
